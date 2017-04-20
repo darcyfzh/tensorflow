@@ -1,0 +1,1 @@
+This part introduces superpowerful trick "batch normalization" and RNN
