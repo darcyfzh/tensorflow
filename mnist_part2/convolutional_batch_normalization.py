@@ -144,42 +144,60 @@ sess = tf.Session()
 sess.run(init)
 
 
+acc_train = []
+acc_test = []
+cross_entropy_train = []
+cross_entropy_test = []
+def trainingAndTesting(max_learning_rate,min_learning_rate,epochs,decay_speed):
+    # learning rate decay (without batch norm)
+    #max_learning_rate = 0.003
+    #min_learning_rate = 0.0001
+    #decay_speed = 2000
+    # learning rate decay (with batch norm)
+    for i in range(epochs):
+      batch_xs, batch_ys = mnist.train.next_batch(100)
+      
+      acc_train.append(sess.run(accuracy, feed_dict={X: batch_xs, Y_: batch_ys, tst: False, pkeep: 1.0, pkeep_conv: 1.0}))
+      cross_entropy_train.append(sess.run(cross_entropy, feed_dict={X: batch_xs, Y_: batch_ys, tst: False, pkeep: 1.0, pkeep_conv: 1.0}))
+      learning_rate = min_learning_rate + (max_learning_rate - min_learning_rate) * math.exp(-i/decay_speed)
+      
+      acc_test.append(sess.run(accuracy, feed_dict={X: mnist.test.images, Y_: mnist.test.labels, tst: True, pkeep: 1.0, pkeep_conv: 1.0}))
+      cross_entropy_test.append(sess.run(cross_entropy, feed_dict={X: mnist.test.images, Y_: mnist.test.labels, tst: True, pkeep: 1.0, pkeep_conv: 1.0}))
+      
+      sess.run(train_step, feed_dict={X: batch_xs, Y_: batch_ys, lr: learning_rate, tst: False, pkeep: 0.75, pkeep_conv: 1.0})
+      sess.run(update_ema, {X: batch_xs, Y_: batch_ys, tst: False, iter: i, pkeep: 1.0, pkeep_conv: 1.0})
+    axis_X = range(epochs)
+    fig1 = plt.subplot(221)
+    fig2 = plt.subplot(222)
+    fig3 = plt.subplot(223)
+    fig4 = plt.subplot(224)
+    
+    plt.plot(axis_X, acc_train)
+    plt.title('train_accuracy')
+    plt.sca(fig1)
+
+    plt.plot(axis_X, acc_test)
+    plt.title('test_accuracy')
+    plt.sca(fig2)
+
+    plt.plot(axis_X, cross_entropy_train)
+    plt.title('cross_entropy_train')
+    plt.sca(fig3)
+
+    plt.plot(axis_X, cross_entropy_test)
+    plt.title('cross_entropy_test')
+    plt.sca(fig4)
+    plt.show()
+
+trainingAndTesting(0.003,0.0001,100,2000)
+
+
 # You can call this function in a loop to train the model, 100 images at a time
-def training_step(i, update_test_data, update_train_data):
-    # training on batches of 100 images with 100 labels
-    batch_X, batch_Y = mnist.train.next_batch(100)
 
-    # learning rate decay
-    max_learning_rate = 0.02
-    min_learning_rate = 0.0001
-    decay_speed = 1600
-    learning_rate = min_learning_rate + (max_learning_rate - min_learning_rate) * math.exp(-i/decay_speed)
-    # compute training values for visualisation
-    if update_train_data:
-        a, c, im, ca, da = sess.run([accuracy, cross_entropy, I, conv_activations, dense_activations], {X: batch_X, Y_: batch_Y, tst: False, pkeep: 1.0, pkeep_conv: 1.0})
-        print(str(i) + ": accuracy:" + str(a) + " loss: " + str(c) + " (lr:" + str(learning_rate) + ")")
-        datavis.append_training_curves_data(i, a, c)
-        datavis.update_image1(im)
-        datavis.append_data_histograms(i, ca, da)
-
-    # compute test values for visualisation
-    if update_test_data:
-        a, c, im = sess.run([accuracy, cross_entropy, It], {X: mnist.test.images, Y_: mnist.test.labels, tst: True, pkeep: 1.0, pkeep_conv: 1.0})
-        print(str(i) + ": ********* epoch " + str(i*100//mnist.train.images.shape[0]+1) + " ********* test accuracy:" + str(a) + " test loss: " + str(c))
-        datavis.append_test_curves_data(i, a, c)
-        datavis.update_image2(im)
-
-    # the backpropagation training step
-    sess.run(train_step, {X: batch_X, Y_: batch_Y, lr: learning_rate, tst: False, pkeep: 0.75, pkeep_conv: 1.0})
-    sess.run(update_ema, {X: batch_X, Y_: batch_Y, tst: False, iter: i, pkeep: 1.0, pkeep_conv: 1.0})
-
-datavis.animate(training_step, 10001, train_data_update_freq=20, test_data_update_freq=100)
 
 # to save the animation as a movie, add save_movie=True as an argument to datavis.animate
 # to disable the visualisation use the following line instead of the datavis.animate line
 # for i in range(10000+1): training_step(i, i % 100 == 0, i % 20 == 0)
-
-print("max test accuracy: " + str(datavis.get_max_test_accuracy()))
 
 ## All runs 10K iterations:
 # batch norm 0.998 lr 0.03-0.0001-1000 no BN offset or scale: best 0.9933 but most of the way under 0.993 and lots of variation. test loss under 2.2 though
